@@ -6,7 +6,7 @@ import streamlit as st
 st.set_page_config(page_title="Matriz BCG por Familias - Menú", layout="wide")
 
 st.title("📊 Generador de Matriz BCG por Categorías de Menú")
-st.markdown("Selecciona una pestaña para administrar y analizar cada familia de platillos de forma independiente con sus propios promedios.")
+st.markdown("Selecciona una pestaña para administrar y analizar cada familia de platillos de forma independiente con sus propios promedios y sub-cuadrantes.")
 
 # Definir las categorías solicitadas
 categorias = [
@@ -79,12 +79,12 @@ for idx, cat in enumerate(categorias):
             df_cat_editado = df_cat_editado.dropna(subset=["Producto"])
             df_cat_editado = df_cat_editado[df_cat_editado["Producto"].astype(str).str.strip() != ""]
             
-            # Asegurar que Margen y Popularidad sean numéricos
+            # Asegurar tipos numéricos
             df_cat_editado["Margen %"] = pd.to_numeric(df_cat_editado["Margen %"], errors="coerce").fillna(0)
             df_cat_editado["Popularidad (Artículos Vendidos)"] = pd.to_numeric(df_cat_editado["Popularidad (Artículos Vendidos)"], errors="coerce").fillna(0)
 
         if not df_cat_editado.empty:
-            # Calcular promedios
+            # Calcular promedios principales
             mean_x = df_cat_editado["Margen %"].mean()
             mean_y = df_cat_editado["Popularidad (Artículos Vendidos)"].mean()
             
@@ -110,9 +110,6 @@ for idx, cat in enumerate(categorias):
             # Generar gráfica exclusiva
             st.markdown(f"### 📈 Gráfica BCG — {cat}")
             
-            # Nota informativa afuera de la gráfica con las referencias de las líneas rojas
-            st.info(f"📌 **Líneas de corte de los cuadrantes:** Margen Promedio = **{mean_x:.1f}%** | Popularidad Promedio = **{mean_y:.1f} artículos**")
-            
             min_x, max_x = df_cat_editado["Margen %"].min(), df_cat_editado["Margen %"].max()
             if min_x == max_x:
                 min_x -= 5
@@ -120,26 +117,68 @@ for idx, cat in enumerate(categorias):
                 
             min_y, max_y = 0, df_cat_editado["Popularidad (Artículos Vendidos)"].max()
             
+            # Cálculo de sub-promedios para los sub-cuadrantes
             sub_x1 = (min_x + mean_x) / 2
             sub_x2 = (mean_x + max_x) / 2
             sub_y1 = (min_y + mean_y) / 2
             sub_y2 = (mean_y + max_y) / 2
             
-            fig, ax = plt.subplots(figsize=(14, 9))
+            # Panel superior con promedios y sub-promedios en NEGRITAS
+            st.info(f"📌 **Promedios Principales (Líneas rojas):** Margen = **{mean_x:.1f}%** | Popularidad = **{mean_y:.1f}**\n\n"
+                    f"🔹 **Sub-promedios (Líneas azules):** Margen Izq = **{sub_x1:.1f}%**, Margen Der = **{sub_x2:.1f}%** | "
+                    f"Pop. Inf = **{sub_y1:.1f}**, Pop. Sup = **{sub_y2:.1f}**")
             
+            fig, ax = plt.subplots(figsize=(15, 10))
+            
+            # Puntos de dispersión
             ax.scatter(df_cat_editado["Margen %"], df_cat_editado["Popularidad (Artículos Vendidos)"], 
                        color='navy', s=120, edgecolors='white', linewidths=1.5, zorder=3)
             
-            # Líneas de promedio (sin la leyenda estorbosa adentro de la gráfica)
-            ax.axvline(mean_x, color='crimson', linestyle='--', linewidth=2, alpha=0.9)
-            ax.axhline(mean_y, color='crimson', linestyle='--', linewidth=2, alpha=0.9)
+            # 1. Líneas principales (Destacadas en color carmesí / rojo fuerte)
+            ax.axvline(mean_x, color='crimson', linestyle='--', linewidth=2.5, alpha=0.9)
+            ax.axhline(mean_y, color='crimson', linestyle='--', linewidth=2.5, alpha=0.9)
             
-            # Sub-cuadrantes
-            ax.axvline(sub_x1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
-            ax.axvline(sub_x2, color='gray', linestyle=':', linewidth=1, alpha=0.6)
-            ax.axhline(sub_y1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
-            ax.axhline(sub_y2, color='gray', linestyle=':', linewidth=1, alpha=0.6)
+            # 2. Líneas de sub-cuadrantes (Destacan sutilmente en color azul pizarra con puntos)
+            sub_color = '#4682B4' # Steel Blue
+            ax.axvline(sub_x1, color=sub_color, linestyle=':', linewidth=1.5, alpha=0.7)
+            ax.axvline(sub_x2, color=sub_color, linestyle=':', linewidth=1.5, alpha=0.7)
+            ax.axhline(sub_y1, color=sub_color, linestyle=':', linewidth=1.5, alpha=0.7)
+            ax.axhline(sub_y2, color=sub_color, linestyle=':', linewidth=1.5, alpha=0.7)
             
+            # Configurar marcas (Ticks) en los ejes X e Y
+            current_xticks = list(ax.get_xticks())
+            for val in [mean_x, sub_x1, sub_x2]:
+                if round(val, 1) not in [round(x, 1) for x in current_xticks]:
+                    current_xticks.append(val)
+            ax.set_xticks(sorted(current_xticks))
+            
+            current_yticks = list(ax.get_yticks())
+            for val in [mean_y, sub_y1, sub_y2]:
+                if round(val, 1) not in [round(y, 1) for y in current_yticks]:
+                    current_yticks.append(val)
+            ax.set_yticks(sorted(current_yticks))
+            
+            plt.xticks(rotation=45, fontsize=9)
+            
+            # Resaltar en NEGRITAS las etiquetas numéricas de los promedios en los ejes
+            for label in ax.get_xticklabels():
+                try:
+                    val_text = float(label.get_text())
+                    if any(np.isclose(val_text, [mean_x, sub_x1, sub_x2], atol=0.1)):
+                        label.set_fontweight('bold')
+                        label.set_color('crimson' if np.isclose(val_text, mean_x, atol=0.1) else '#2C5282')
+                except ValueError:
+                    pass
+
+            for label in ax.get_yticklabels():
+                try:
+                    val_text = float(label.get_text())
+                    if any(np.isclose(val_text, [mean_y, sub_y1, sub_y2], atol=0.1)):
+                        label.set_fontweight('bold')
+                        label.set_color('crimson' if np.isclose(val_text, mean_y, atol=0.1) else '#2C5282')
+                except ValueError:
+                    pass
+
             for i, row in df_cat_editado.iterrows():
                 prod = str(row["Producto"])
                 ax.annotate(prod, 
@@ -152,10 +191,11 @@ for idx, cat in enumerate(categorias):
                              bbox=dict(boxstyle="round,pad=0.35", fc="white", ec="darkgray", alpha=0.95),
                              arrowprops=dict(arrowstyle="->", color="crimson", lw=0.9, connectionstyle="arc3,rad=0"))
             
-            ax.set_title(f"Matriz BCG Independiente: {cat}", fontsize=15, fontweight='bold', pad=15)
+            # Título dinámico según la categoría activa
+            ax.set_title(f"Matriz BCG con Sub-Cuadrantes: {cat}", fontsize=15, fontweight='bold', pad=15)
             ax.set_xlabel("Margen %", fontsize=12, fontweight='bold')
             ax.set_ylabel("Popularidad (Artículos Vendidos)", fontsize=12, fontweight='bold')
-            ax.grid(True, linestyle=':', alpha=0.6, zorder=0)
+            ax.grid(True, linestyle=':', alpha=0.4, zorder=0)
             
             ax.set_xlim(min_x - 8, max_x + 8)
             ax.set_ylim(-50, max_y * 1.15 if max_y > 0 else 100)
