@@ -8,13 +8,13 @@ st.set_page_config(page_title="Matriz BCG por Familias - Menú", layout="wide")
 st.title("📊 Generador de Matriz BCG por Categorías de Menú")
 st.markdown("Selecciona una pestaña para administrar y analizar cada familia de platillos de forma independiente con sus propios promedios.")
 
-# Definir las categorías solicitadas con datos iniciales organizados
+# Definir las categorías solicitadas
 categorias = [
     "DESAYUNOS", "QUESADILLAS", "ENTRADAS", "CALDOS", 
     "MARISCOS", "CARNES", "CHAROLAS DE CARNES", "CHAROLAS DE MARISCOS"
 ]
 
-# Diccionario con datos base de ejemplo para cada categoría
+# Diccionario con datos base de ejemplo
 datos_base = {
     "DESAYUNOS": [
         ("Huevos al gusto", 55.0, 120),
@@ -61,22 +61,30 @@ datos_base = {
     ]
 }
 
-# Crear las pestañas en la interfaz de la aplicación
+# Crear las pestañas en la interfaz
 pestanas = st.tabs(categorias)
 
 for idx, cat in enumerate(categorias):
     with pestanas[idx]:
         st.subheader(f"📂 Familia: {cat}")
-        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}**:")
+        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}**. *(Puedes agregar filas con el botón '+' o borrar filas vacías seleccionándolas y presionando la tecla Supr/Backspace)*:")
         
-        # DataFrame inicial para esta categoría
         df_cat_inicial = pd.DataFrame(datos_base[cat], columns=["Producto", "Margen %", "Popularidad (Artículos Vendidos)"])
         
-        # Editor interactivo independiente por categoría
+        # Editor interactivo
         df_cat_editado = st.data_editor(df_cat_inicial, num_rows="dynamic", key=f"editor_{cat}", use_container_width=True)
         
         if not df_cat_editado.empty:
-            # Calcular promedios exclusivos de esta categoría
+            # LIMPIEZA AUTOMÁTICA: Eliminar filas donde el nombre del producto esté vacío, sea None o nulo
+            df_cat_editado = df_cat_editado.dropna(subset=["Producto"])
+            df_cat_editado = df_cat_editado[df_cat_editado["Producto"].astype(str).str.strip() != ""]
+            
+            # Asegurar que Margen y Popularidad sean numéricos
+            df_cat_editado["Margen %"] = pd.to_numeric(df_cat_editado["Margen %"], errors="coerce").fillna(0)
+            df_cat_editado["Popularidad (Artículos Vendidos)"] = pd.to_numeric(df_cat_editado["Popularidad (Artículos Vendidos)"], errors="coerce").fillna(0)
+
+        if not df_cat_editado.empty:
+            # Calcular promedios exclusivos de esta categoría limpia
             mean_x = df_cat_editado["Margen %"].mean()
             mean_y = df_cat_editado["Popularidad (Artículos Vendidos)"].mean()
             
@@ -99,7 +107,7 @@ for idx, cat in enumerate(categorias):
             
             st.dataframe(df_cat_editado, use_container_width=True)
             
-            # Generar gráfica exclusiva para la categoría
+            # Generar gráfica exclusiva
             st.markdown(f"### 📈 Gráfica BCG — {cat}")
             
             min_x, max_x = df_cat_editado["Margen %"].min(), df_cat_editado["Margen %"].max()
@@ -119,11 +127,9 @@ for idx, cat in enumerate(categorias):
             ax.scatter(df_cat_editado["Margen %"], df_cat_editado["Popularidad (Artículos Vendidos)"], 
                        color='navy', s=120, edgecolors='white', linewidths=1.5, zorder=3)
             
-            # Líneas de promedio independientes para esta categoría
             ax.axvline(mean_x, color='crimson', linestyle='--', linewidth=2, alpha=0.9, label=f'Promedio Margen ({mean_x:.1f}%)')
             ax.axhline(mean_y, color='crimson', linestyle='--', linewidth=2, alpha=0.9, label=f'Promedio Popularidad ({mean_y:.1f})')
             
-            # Sub-cuadrantes
             ax.axvline(sub_x1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
             ax.axvline(sub_x2, color='gray', linestyle=':', linewidth=1, alpha=0.6)
             ax.axhline(sub_y1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
@@ -151,3 +157,5 @@ for idx, cat in enumerate(categorias):
             ax.set_ylim(-50, max_y * 1.15 if max_y > 0 else 100)
             
             st.pyplot(fig)
+        else:
+            st.info(f"Agrega al menos un platillo en la tabla de {cat} para ver sus métricas y gráfica.")
