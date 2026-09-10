@@ -5,131 +5,123 @@ import streamlit as st
 
 st.set_page_config(page_title="Calculadora Matriz BCG - Menú", layout="wide")
 
-st.title("📊 Generador Automático de Matriz BCG para Restaurante")
-st.markdown("Ingresa o edita los datos de tus platillos directamente en la tabla. La gráfica y la clasificación se actualizarán al instante.")
+st.title("📊 Generador Automático de Matriz BCG por Categorías")
+st.markdown("Administra tus platillos, asígnales una categoría y analiza el menú de forma global o filtrada.")
 
-# Datos iniciales precargados
+# Datos iniciales precargados con la columna "Categoría"
 datos_iniciales = pd.DataFrame([
-    ("Mole de guajolote", 44.0, 61),
-    ("Caldo de guajolote", 37.0, 76),
-    ("Barbacoa de borrego", 42.0, 515),
-    ("Mole de gallina", 63.0, 226),
-    ("Caldo de gallina", 63.0, 967),
-    ("Ziguamut de conejo", 94.0, 159),
-    ("Asado de puerco", 58.0, 58),
-    ("Mondongo", 48.0, 388),
-    ("Chile de relleno pollo", 96.0, 185),
-    ("chile relleno puerco", 96.0, 67),
-    ("ziguamut de res", 27.0, 63),
-    ("Cocido de res", 53.0, 103),
-    ("Albóndigas enchipotladas", 41.0, 66),
-    ("Bistec a la mexicana", 60.0, 130),
-    ("Milanesa de puerco", 53.0, 23),
-    ("Milanesa de res", 33.0, 38),
-    ("Milanesa de pollo", 60.0, 228),
-    ("Sopa de pan", 71.0, 40),
-    ("Enchiladas de pollo", 25.0, 97),
-    ("Taco de birra", 15.0, 58)
-], columns=["Producto", "Margen %", "Popularidad (Artículos Vendidos)"])
+    ("Mole de guajolote", "Caldos y Moles", 44.0, 61),
+    ("Caldo de guajolote", "Caldos y Moles", 37.0, 76),
+    ("Barbacoa de borrego", "Carnes", 42.0, 515),
+    ("Mole de gallina", "Caldos y Moles", 63.0, 226),
+    ("Caldo de gallina", "Caldos y Moles", 63.0, 967),
+    ("Ziguamut de conejo", "Especialidades", 94.0, 159),
+    ("Asado de puerco", "Carnes", 58.0, 58),
+    ("Mondongo", "Caldos y Moles", 48.0, 388),
+    ("Chile de relleno pollo", "Entradas y Guisados", 96.0, 185),
+    ("chile relleno puerco", "Entradas y Guisados", 96.0, 67),
+    ("ziguamut de res", "Especialidades", 27.0, 63),
+    ("Cocido de res", "Caldos y Moles", 53.0, 103),
+    ("Albóndigas enchipotladas", "Entradas y Guisados", 41.0, 66),
+    ("Bistec a la mexicana", "Carnes", 60.0, 130),
+    ("Milanesa de puerco", "Carnes", 53.0, 23),
+    ("Milanesa de res", "Carnes", 33.0, 38),
+    ("Milanesa de pollo", "Carnes", 60.0, 228),
+    ("Sopa de pan", "Entradas y Guisados", 71.0, 40),
+    ("Enchiladas de pollo", "Antojitos", 25.0, 97),
+    ("Taco de birra", "Antojitos", 15.0, 58)
+], columns=["Producto", "Categoría", "Margen %", "Popularidad (Artículos Vendidos)"])
 
-st.subheader("1. Edición de Datos del Menú")
+st.subheader("1. Edición de Datos y Familias de Platillos")
+st.markdown("Puedes agregar nuevas filas, cambiar categorías libremente o editar valores directamente en la tabla.")
 df_usuario = st.data_editor(datos_iniciales, num_rows="dynamic", use_container_width=True)
 
 if not df_usuario.empty:
-    mean_x = df_usuario["Margen %"].mean()
-    mean_y = df_usuario["Popularidad (Artículos Vendidos)"].mean()
+    # Barra lateral de filtros
+    st.sidebar.header("🔍 Filtros de Análisis")
+    categorias_disponibles = ["Todas las categorías"] + list(df_usuario["Categoría"].dropna().unique())
+    categoria_seleccionada = st.sidebar.selectbox("Selecciona la categoría a visualizar:", categorias_disponibles)
 
-    def clasificar_bcg(row, mx, my):
-        if row["Margen %"] >= mx and row["Popularidad (Artículos Vendidos)"] >= my:
-            return "Estrella ⭐"
-        elif row["Margen %"] < mx and row["Popularidad (Artículos Vendidos)"] >= my:
-            return "Vaca 🐮"
-        elif row["Margen %"] >= mx and row["Popularidad (Artículos Vendidos)"] < my:
-            return "Interrogante ❓"
-        else:
-            return "Perro 🐶"
+    # Filtrar datos según la selección de la barra lateral
+    if categoria_seleccionada != "Todas las categorías":
+        df_filtrado = df_usuario[df_usuario["Categoría"] == categoria_seleccionada].copy()
+        titulo_filtro = f"Categoría: {categoria_seleccionada}"
+    else:
+        df_filtrado = df_usuario.copy()
+        titulo_filtro = "Menú Completo (Todas las Categorías)"
 
-    df_usuario["Cuadrante BCG"] = df_usuario.apply(lambda r: clasificar_bcg(r, mean_x, mean_y), axis=1)
+    if not df_filtrado.empty:
+        mean_x = df_filtrado["Margen %"].mean()
+        mean_y = df_filtrado["Popularidad (Artículos Vendidos)"].mean()
 
-    st.subheader("2. Resultados y Clasificación")
-    col1, col2 = st.columns(2)
-    col1.metric("Margen Promedio del Menú", f"{mean_2:.2f}%" if 'mean_2' in locals() else f"{mean_x:.2f}%")
-    col2.metric("Popularidad Promedio", f"{mean_y:.2f} arts.")
+        def clasificar_bcg(row, mx, my):
+            if row["Margen %"] >= mx and row["Popularidad (Artículos Vendidos)"] >= my:
+                return "Estrella ⭐"
+            elif row["Margen %"] < mx and row["Popularidad (Artículos Vendidos)"] >= my:
+                return "Vaca 🐮"
+            elif row["Margen %"] >= mx and row["Popularidad (Artículos Vendidos)"] < my:
+                return "Interrogante ❓"
+            else:
+                return "Perro 🐶"
 
-    st.dataframe(df_usuario, use_container_width=True)
+        df_filtrado["Cuadrante BCG"] = df_filtrado.apply(lambda r: clasificar_bcg(r, mean_x, mean_y), axis=1)
 
-    st.subheader("3. Visualización de la Matriz BCG")
-    
-    min_x, max_x = df_usuario["Margen %"].min(), df_usuario["Margen %"].max()
-    min_y, max_y = 0, df_usuario["Popularidad (Artículos Vendidos)"].max()
+        st.subheader(f"2. Resultados y Clasificación — [{titulo_filtro}]")
+        col1, col2 = st.columns(2)
+        col1.metric("Margen Promedio", f"{mean_x:.2f}%")
+        col2.metric("Popularidad Promedio", f"{mean_y:.2f} arts.")
 
-    sub_x1 = (min_x + mean_x) / 2
-    sub_x2 = (mean_x + max_x) / 2
-    sub_y1 = (min_y + mean_y) / 2
-    sub_y2 = (mean_y + max_y) / 2
+        st.dataframe(df_filtrado, use_container_width=True)
 
-    # Figura más grande para visibilidad óptima en tablets
-    fig, ax = plt.subplots(figsize=(16, 11))
-    
-    # Puntos de dispersión grandes, en azul oscuro con borde blanco para destacar al instante
-    ax.scatter(df_usuario["Margen %"], df_usuario["Popularidad (Artículos Vendidos)"], 
-               color='navy', s=120, edgecolors='white', linewidths=1.5, zorder=3)
+        st.subheader(f"3. Visualización BCG — [{titulo_filtro}]")
+        
+        min_x, max_x = df_filtrado["Margen %"].min(), df_filtrado["Margen %"].max()
+        # Si todos los elementos tienen el mismo margen, evitamos error de rango
+        if min_x == max_x:
+            min_x -= 5
+            max_x += 5
 
-    # Ejes principales de promedios
-    ax.axvline(mean_x, color='crimson', linestyle='--', linewidth=2, alpha=0.9, label=f'Promedio Margen ({mean_x:.1f}%)')
-    ax.axhline(mean_y, color='crimson', linestyle='--', linewidth=2, alpha=0.9, label=f'Promedio Popularidad ({mean_y:.1f})')
+        min_y, max_y = 0, df_filtrado["Popularidad (Artículos Vendidos)"].max()
 
-    # Sub-cuadrantes
-    ax.axvline(sub_x1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
-    ax.axvline(sub_x2, color='gray', linestyle=':', linewidth=1, alpha=0.6)
-    ax.axhline(sub_y1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
-    ax.axhline(sub_y2, color='gray', linestyle=':', linewidth=1, alpha=0.6)
+        sub_x1 = (min_x + mean_x) / 2
+        sub_x2 = (mean_x + max_x) / 2
+        sub_y1 = (min_y + mean_y) / 2
+        sub_y2 = (mean_y + max_y) / 2
 
-    # Etiquetas con desplazamientos amplios y conectores limpios para evitar encimarse
-    offsets = {
-        "Caldo de gallina": (0, 40),
-        "Barbacoa de borrego": (-65, 25),
-        "Mondongo": (-55, -35),
-        "Milanesa de pollo": (-65, 35),
-        "Mole de gallina": (65, 35),
-        "Chile de relleno pollo": (65, 30),
-        "Ziguamut de conejo": (65, -30),
-        "chile relleno puerco": (75, -20),
-        "Bistec a la mexicana": (55, 25),
-        "Sopa de pan": (45, -30),
-        "Asado de puerco": (45, -30),
-        "Cocido de res": (-45, 30),
-        "Albóndigas enchipotladas": (-75, -35),
-        "Caldo de guajolote": (-55, 35),
-        "Mole de guajolote": (35, -35),
-        "Milanesa de puerco": (55, -35),
-        "Milanesa de res": (-65, -35),
-        "ziguamut de res": (-55, 30),
-        "Enchiladas de pollo": (-55, 30),
-        "Taco de birra": (-45, 35)
-    }
+        fig, ax = plt.subplots(figsize=(16, 11))
+        
+        ax.scatter(df_filtrado["Margen %"], df_filtrado["Popularidad (Artículos Vendidos)"], 
+                   color='navy', s=120, edgecolors='white', linewidths=1.5, zorder=3)
 
-    for i, row in df_usuario.iterrows():
-        prod = str(row["Producto"])
-        offset = offsets.get(prod, (30, 25)) # Desplazamiento por defecto si agregas nuevos platillos
-        ax.annotate(prod, 
-                     (row["Margen %"], row["Popularidad (Artículos Vendidos)"]),
-                     textcoords="offset points", 
-                     xytext=offset, 
-                     ha='center', 
-                     fontsize=9, 
-                     fontweight='bold',
-                     bbox=dict(boxstyle="round,pad=0.35", fc="white", ec="darkgray", alpha=0.95),
-                     arrowprops=dict(arrowstyle="->", color="crimson", lw=0.9, connectionstyle="arc3,rad=0"))
+        ax.axvline(mean_x, color='crimson', linestyle='--', linewidth=2, alpha=0.9, label=f'Promedio Margen ({mean_x:.1f}%)')
+        ax.axhline(mean_y, color='crimson', linestyle='--', linewidth=2, alpha=0.9, label=f'Promedio Popularidad ({mean_y:.1f})')
 
-    ax.set_title("Matriz BCG Detallada: Margen vs. Popularidad", fontsize=16, fontweight='bold', pad=15)
-    ax.set_xlabel("Margen %", fontsize=13, fontweight='bold')
-    ax.set_ylabel("Popularidad (Artículos Vendidos)", fontsize=13, fontweight='bold')
-    ax.grid(True, linestyle=':', alpha=0.6, zorder=0)
-    ax.legend(loc='upper right', fontsize=10)
-    
-    # Límites amplios para que los textos queden cómodos y no se corten
-    ax.set_xlim(min_x - 8, max_x + 8)
-    ax.set_ylim(-80, max_y * 1.12 if max_y > 0 else 100)
+        ax.axvline(sub_x1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
+        ax.axvline(sub_x2, color='gray', linestyle=':', linewidth=1, alpha=0.6)
+        ax.axhline(sub_y1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
+        ax.axhline(sub_y2, color='gray', linestyle=':', linewidth=1, alpha=0.6)
 
-    st.pyplot(fig)
+        for i, row in df_filtrado.iterrows():
+            prod = str(row["Producto"])
+            ax.annotate(prod, 
+                         (row["Margen %"], row["Popularidad (Artículos Vendidos)"]),
+                         textcoords="offset points", 
+                         xytext=(25, 20), 
+                         ha='center', 
+                         fontsize=9, 
+                         fontweight='bold',
+                         bbox=dict(boxstyle="round,pad=0.35", fc="white", ec="darkgray", alpha=0.95),
+                         arrowprops=dict(arrowstyle="->", color="crimson", lw=0.9, connectionstyle="arc3,rad=0"))
+
+        ax.set_title(f"Matriz BCG: {titulo_filtro}", fontsize=16, fontweight='bold', pad=15)
+        ax.set_xlabel("Margen %", fontsize=13, fontweight='bold')
+        ax.set_ylabel("Popularidad (Artículos Vendidos)", fontsize=13, fontweight='bold')
+        ax.grid(True, linestyle=':', alpha=0.6, zorder=0)
+        ax.legend(loc='upper right', fontsize=10)
+        
+        ax.set_xlim(min_x - 8, max_x + 8)
+        ax.set_ylim(-80, max_y * 1.15 if max_y > 0 else 100)
+
+        st.pyplot(fig)
+    else:
+        st.warning("No hay platillos registrados para esta categoría.")
