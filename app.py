@@ -6,7 +6,7 @@ import streamlit as st
 st.set_page_config(page_title="Matriz BCG por Familias - Menú", layout="wide")
 
 st.title("📊 Generador de Matriz BCG por Categorías de Menú")
-st.markdown("Sistema optimizado con memoria de sesión local y distribución correcta de cuadrantes BCG.")
+st.markdown("Sistema optimizado con memoria de sesión local, subida masiva de Excel y copiado/pegado directo de datos.")
 
 # Definir las categorías solicitadas
 categorias = [
@@ -70,13 +70,45 @@ if "dataframes" not in st.session_state:
             columns=["Producto", "Margen %", "Popularidad (Artículos Vendidos)"]
         )
 
+# --- BARRA LATERAL PARA CARGAR EXCEL MASIVAMENTE ---
+st.sidebar.header("📁 Carga Masiva de Menú")
+st.sidebar.markdown("Sube un archivo de Excel (`.xlsx`) o CSV con tus productos. Debe incluir las columnas: **Producto**, **Margen %**, **Popularidad (Artículos Vendidos)** y opcionalmente **Categoria**.")
+
+archivo_subido = st.sidebar.file_uploader("Selecciona tu archivo Excel / CSV", type=["xlsx", "csv"])
+
+if archivo_subido is not None:
+    try:
+        if archivo_subido.name.endswith('.csv'):
+            df_subido = pd.read_csv(archivo_subido)
+        else:
+            df_subido = pd.read_excel(archivo_subido)
+        
+        # Normalizar nombres de columnas por si vienen con mayúsculas/minúsculas
+        df_subido.columns = [c.strip() for c in df_subido.columns]
+        
+        columnas_requeridas = ["Producto", "Margen %", "Popularidad (Artículos Vendidos)"]
+        if all(col in df_subido.columns for col in columnas_requeridas):
+            if "Categoria" in df_subido.columns:
+                # Distribuir por categoría automáticamente si la columna existe
+                for cat in categorias:
+                    df_cat_sub = df_subido[df_subido["Categoria"].astype(str).str.upper() == cat]
+                    if not df_cat_sub.empty:
+                        st.session_state.dataframes[cat] = df_cat_sub[["Producto", "Margen %", "Popularidad (Artículos Vendidos)"]].copy()
+                st.sidebar.success("¡Menú cargado y distribuido por categorías exitosamente!")
+            else:
+                st.sidebar.warning("El archivo no tiene columna 'Categoria'. Sube los datos por categoría o agrégala para distribución automática.")
+        else:
+            st.sidebar.error(f"Faltan columnas obligatorias. Tu archivo debe tener: {columnas_requeridas}")
+    except Exception as e:
+        st.sidebar.error(f"Error al leer el archivo: {e}")
+
 # Crear las pestañas en la interfaz
 pestanas = st.tabs(categorias)
 
 for idx, cat in enumerate(categorias):
     with pestanas[idx]:
         st.subheader(f"📂 Familia: {cat}")
-        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}**:")
+        st.markdown(f"Puedes editar directamente, **pegar filas copiadas desde Excel** (`Ctrl + V`) o usar el cargador en la barra lateral izquierda:")
         
         df_cat_editado = st.data_editor(
             st.session_state.dataframes[cat], 
