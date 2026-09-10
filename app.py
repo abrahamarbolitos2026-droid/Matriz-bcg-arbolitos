@@ -6,14 +6,16 @@ import streamlit as st
 st.set_page_config(page_title="Matriz BCG por Familias - Menú", layout="wide")
 
 st.title("📊 Generador de Matriz BCG por Categorías de Menú")
-st.markdown("Selecciona una pestaña para administrar y analizar cada familia de platillos de forma independiente con sus propios promedios y sub-cuadrantes.")
+st.markdown("Sistema optimizado con memoria de sesión local para proteger tus datos ante interrupciones momentáneas de internet.")
 
+# Definir las categorías solicitadas
 categorias = [
     "DESAYUNOS", "QUESADILLAS", "ENTRADAS", "CALDOS", 
     "MARISCOS", "CARNES", "CHAROLAS DE CARNES", "CHAROLAS DE MARISCOS"
 ]
 
-datos_base = {
+# Diccionario con datos base iniciales
+datos_base_iniciales = {
     "DESAYUNOS": [
         ("Huevos al gusto", 55.0, 120),
         ("Chilaquiles sencillos", 60.0, 180),
@@ -59,26 +61,50 @@ datos_base = {
     ]
 }
 
+# --- INICIALIZAR MEMORIA DE SESIÓN (PROTECCIÓN CONTRA CAÍDAS DE RED) ---
+if "dataframes" not in st.session_state:
+    st.session_state.dataframes = {}
+    for cat in categorias:
+        st.session_state.dataframes[cat] = pd.DataFrame(
+            datos_base_iniciales[cat], 
+            columns=["Producto", "Margen %", "Popularidad (Artículos Vendidos)"]
+        )
+
+# Crear las pestañas en la interfaz
 pestanas = st.tabs(categorias)
 
 for idx, cat in enumerate(categorias):
     with pestanas[idx]:
         st.subheader(f"📂 Familia: {cat}")
-        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}**:")
+        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}** (Tus cambios se resguardan en la memoria de la tablet):")
         
-        df_cat_inicial = pd.DataFrame(datos_base[cat], columns=["Producto", "Margen %", "Popularidad (Artículos Vendidos)"])
-        df_cat_editado = st.data_editor(df_cat_inicial, num_rows="dynamic", key=f"editor_{cat}", use_container_width=True)
+        # Editor interactivo enlazado a st.session_state
+        df_cat_editado = st.data_editor(
+            st.session_state.dataframes[cat], 
+            num_rows="dynamic", 
+            key=f"editor_{cat}", 
+            use_container_width=True
+        )
         
-        if not df_cat_editado.empty:
-            df_cat_editado = df_cat_editado.dropna(subset=["Producto"])
-            df_cat_editado = df_cat_editado[df_cat_editado["Producto"].astype(str).str.strip() != ""]
-            
-            df_cat_editado["Margen %"] = pd.to_numeric(df_cat_editado["Margen %"], errors="coerce").fillna(0)
-            df_cat_editado["Popularidad (Artículos Vendidos)"] = pd.to_numeric(df_cat_editado["Popularidad (Artículos Vendidos)"], errors="coerce").fillna(0)
+        # Actualizar la sesión de inmediato con los cambios del usuario
+        if df_cat_editado is not None:
+            st.session_state.dataframes[cat] = df_cat_editado.copy()
 
-        if not df_cat_editado.empty:
-            mean_x = df_cat_editado["Margen %"].mean()
-            mean_y = df_cat_editado["Popularidad (Artículos Vendidos)"].mean()
+        df_actual = st.session_state.dataframes[cat]
+
+        if not df_actual.empty:
+            # LIMPIEZA AUTOMÁTICA: Eliminar filas vacías
+            df_actual = df_actual.dropna(subset=["Producto"])
+            df_actual = df_actual[df_actual["Producto"].astype(str).str.strip() != ""]
+            
+            # Asegurar tipos numéricos
+            df_actual["Margen %"] = pd.to_numeric(df_actual["Margen %"], errors="coerce").fillna(0)
+            df_actual["Popularidad (Artículos Vendidos)"] = pd.to_numeric(df_actual["Popularidad (Artículos Vendidos)"], errors="coerce").fillna(0)
+
+        if not df_actual.empty:
+            # Calcular promedios principales
+            mean_x = df_actual["Margen %"].mean()
+            mean_y = df_actual["Popularidad (Artículos Vendidos)"].mean()
             
             def clasificar_bcg(row, mx, my):
                 if row["Margen %"] >= mx and row["Popularidad (Artículos Vendidos)"] >= my:
@@ -90,29 +116,32 @@ for idx, cat in enumerate(categorias):
                 else:
                     return "Perro 🐶"
             
-            df_cat_editado["Cuadrante BCG"] = df_cat_editado.apply(lambda r: clasificar_bcg(r, mean_x, mean_y), axis=1)
+            df_actual["Cuadrante BCG"] = df_actual.apply(lambda r: clasificar_bcg(r, mean_x, mean_y), axis=1)
             
             st.markdown("---")
             col1, col2 = st.columns(2)
             col1.metric(f"Margen Promedio ({cat})", f"{mean_x:.2f}%")
             col2.metric(f"Popularidad Promedio ({cat})", f"{mean_y:.2f} arts.")
             
-            st.dataframe(df_cat_editado, use_container_width=True)
+            st.dataframe(df_actual, use_container_width=True)
             
+            # Generar gráfica exclusiva
             st.markdown(f"### 📈 Gráfica BCG — {cat}")
             
-            min_x, max_x = df_cat_editado["Margen %"].min(), df_cat_editado["Margen %"].max()
+            min_x, max_x = df_actual["Margen %"].min(), df_actual["Margen %"].max()
             if min_x == max_x:
                 min_x -= 5
                 max_x += 5
                 
-            min_y, max_y = 0, df_cat_editado["Popularidad (Artículos Vendidos)"].max()
+            min_y, max_y = 0, df_actual["Popularidad (Artículos Vendidos)"].max()
             
+            # Cálculo de sub-promedios para los sub-cuadrantes
             sub_x1 = (min_x + mean_x) / 2
             sub_x2 = (mean_x + max_x) / 2
             sub_y1 = (min_y + mean_y) / 2
             sub_y2 = (mean_y + max_y) / 2
             
+            # Panel superior con promedios y sub-promedios en NEGRITAS
             st.info(f"📌 **Promedios Principales (Líneas rojas):** Margen = **{mean_x:.1f}%** | Popularidad = **{mean_y:.1f}**\n\n"
                     f"🔹 **Sub-promedios (Líneas azules):** Margen Izq = **{sub_x1:.1f}%**, Margen Der = **{sub_x2:.1f}%** | "
                     f"Pop. Inf = **{sub_y1:.1f}**, Pop. Sup = **{sub_y2:.1f}**")
@@ -130,13 +159,13 @@ for idx, cat in enumerate(categorias):
                     fontsize=40, fontweight='bold', ha='center', va='center', alpha=0.08, color='gray', zorder=0)
             ax.text((mean_x + xlim_max) / 2, (mean_y + ylim_max) / 2, "ESTRELLA", 
                     fontsize=40, fontweight='bold', ha='center', va='center', alpha=0.08, color='gray', zorder=0)
-            ax.text((xlim_min + mean_x) / 2, (ylim_min + mean_y) / 2, "PERRO", 
+            ax.text((xlim_min + mean_x) / 2, (mean_y + ylim_max) / 2, "PERRO", 
                     fontsize=40, fontweight='bold', ha='center', va='center', alpha=0.08, color='gray', zorder=0)
-            ax.text((mean_x + xlim_max) / 2, (ylim_min + mean_y) / 2, "INTERROGANTE", 
+            ax.text((mean_x + xlim_max) / 2, (mean_y + ylim_max) / 2, "INTERROGANTE", 
                     fontsize=35, fontweight='bold', ha='center', va='center', alpha=0.08, color='gray', zorder=0)
             
             # Puntos de dispersión
-            ax.scatter(df_cat_editado["Margen %"], df_cat_editado["Popularidad (Artículos Vendidos)"], 
+            ax.scatter(df_actual["Margen %"], df_actual["Popularidad (Artículos Vendidos)"], 
                        color='navy', s=120, edgecolors='white', linewidths=1.5, zorder=3)
             
             # Líneas principales y sub-cuadrantes
@@ -181,7 +210,7 @@ for idx, cat in enumerate(categorias):
                 except ValueError:
                     pass
 
-            for i, row in df_cat_editado.iterrows():
+            for i, row in df_actual.iterrows():
                 prod = str(row["Producto"])
                 ax.annotate(prod, 
                              (row["Margen %"], row["Popularidad (Artículos Vendidos)"]),
