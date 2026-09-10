@@ -67,7 +67,7 @@ pestanas = st.tabs(categorias)
 for idx, cat in enumerate(categorias):
     with pestanas[idx]:
         st.subheader(f"📂 Familia: {cat}")
-        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}**. *(Puedes agregar filas con el botón '+' o borrar filas vacías seleccionándolas y presionando la tecla Supr/Backspace)*:")
+        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}**:")
         
         df_cat_inicial = pd.DataFrame(datos_base[cat], columns=["Producto", "Margen %", "Popularidad (Artículos Vendidos)"])
         
@@ -75,7 +75,7 @@ for idx, cat in enumerate(categorias):
         df_cat_editado = st.data_editor(df_cat_inicial, num_rows="dynamic", key=f"editor_{cat}", use_container_width=True)
         
         if not df_cat_editado.empty:
-            # LIMPIEZA AUTOMÁTICA: Eliminar filas donde el nombre del producto esté vacío, sea None o nulo
+            # LIMPIEZA AUTOMÁTICA: Eliminar filas vacías
             df_cat_editado = df_cat_editado.dropna(subset=["Producto"])
             df_cat_editado = df_cat_editado[df_cat_editado["Producto"].astype(str).str.strip() != ""]
             
@@ -84,7 +84,7 @@ for idx, cat in enumerate(categorias):
             df_cat_editado["Popularidad (Artículos Vendidos)"] = pd.to_numeric(df_cat_editado["Popularidad (Artículos Vendidos)"], errors="coerce").fillna(0)
 
         if not df_cat_editado.empty:
-            # Calcular promedios exclusivos de esta categoría limpia
+            # Calcular promedios
             mean_x = df_cat_editado["Margen %"].mean()
             mean_y = df_cat_editado["Popularidad (Artículos Vendidos)"].mean()
             
@@ -110,6 +110,9 @@ for idx, cat in enumerate(categorias):
             # Generar gráfica exclusiva
             st.markdown(f"### 📈 Gráfica BCG — {cat}")
             
+            # Nota informativa afuera de la gráfica con las referencias de las líneas rojas
+            st.info(f"📌 **Líneas de corte de los cuadrantes:** Margen Promedio = **{mean_x:.1f}%** | Popularidad Promedio = **{mean_y:.1f} artículos**")
+            
             min_x, max_x = df_cat_editado["Margen %"].min(), df_cat_editado["Margen %"].max()
             if min_x == max_x:
                 min_x -= 5
@@ -127,9 +130,11 @@ for idx, cat in enumerate(categorias):
             ax.scatter(df_cat_editado["Margen %"], df_cat_editado["Popularidad (Artículos Vendidos)"], 
                        color='navy', s=120, edgecolors='white', linewidths=1.5, zorder=3)
             
-            ax.axvline(mean_x, color='crimson', linestyle='--', linewidth=2, alpha=0.9, label=f'Promedio Margen ({mean_x:.1f}%)')
-            ax.axhline(mean_y, color='crimson', linestyle='--', linewidth=2, alpha=0.9, label=f'Promedio Popularidad ({mean_y:.1f})')
+            # Líneas de promedio (sin la leyenda estorbosa adentro de la gráfica)
+            ax.axvline(mean_x, color='crimson', linestyle='--', linewidth=2, alpha=0.9)
+            ax.axhline(mean_y, color='crimson', linestyle='--', linewidth=2, alpha=0.9)
             
+            # Sub-cuadrantes
             ax.axvline(sub_x1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
             ax.axvline(sub_x2, color='gray', linestyle=':', linewidth=1, alpha=0.6)
             ax.axhline(sub_y1, color='gray', linestyle=':', linewidth=1, alpha=0.6)
@@ -151,7 +156,6 @@ for idx, cat in enumerate(categorias):
             ax.set_xlabel("Margen %", fontsize=12, fontweight='bold')
             ax.set_ylabel("Popularidad (Artículos Vendidos)", fontsize=12, fontweight='bold')
             ax.grid(True, linestyle=':', alpha=0.6, zorder=0)
-            ax.legend(loc='upper right', fontsize=10)
             
             ax.set_xlim(min_x - 8, max_x + 8)
             ax.set_ylim(-50, max_y * 1.15 if max_y > 0 else 100)
