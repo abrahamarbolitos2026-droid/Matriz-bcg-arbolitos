@@ -6,7 +6,7 @@ import streamlit as st
 st.set_page_config(page_title="Matriz BCG por Familias - Menú", layout="wide")
 
 st.title("📊 Generador de Matriz BCG por Categorías de Menú")
-st.markdown("Sistema optimizado con memoria de sesión local para proteger tus datos ante interrupciones momentáneas de internet.")
+st.markdown("Sistema optimizado con memoria de sesión local y distribución correcta de cuadrantes BCG.")
 
 # Definir las categorías solicitadas
 categorias = [
@@ -61,7 +61,7 @@ datos_base_iniciales = {
     ]
 }
 
-# --- INICIALIZAR MEMORIA DE SESIÓN (PROTECCIÓN CONTRA CAÍDAS DE RED) ---
+# --- INICIALIZAR MEMORIA DE SESIÓN ---
 if "dataframes" not in st.session_state:
     st.session_state.dataframes = {}
     for cat in categorias:
@@ -76,9 +76,8 @@ pestanas = st.tabs(categorias)
 for idx, cat in enumerate(categorias):
     with pestanas[idx]:
         st.subheader(f"📂 Familia: {cat}")
-        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}** (Tus cambios se resguardan en la memoria de la tablet):")
+        st.markdown(f"Edita los platillos, costos y ventas específicos para **{cat}**:")
         
-        # Editor interactivo enlazado a st.session_state
         df_cat_editado = st.data_editor(
             st.session_state.dataframes[cat], 
             num_rows="dynamic", 
@@ -86,23 +85,19 @@ for idx, cat in enumerate(categorias):
             use_container_width=True
         )
         
-        # Actualizar la sesión de inmediato con los cambios del usuario
         if df_cat_editado is not None:
             st.session_state.dataframes[cat] = df_cat_editado.copy()
 
         df_actual = st.session_state.dataframes[cat]
 
         if not df_actual.empty:
-            # LIMPIEZA AUTOMÁTICA: Eliminar filas vacías
             df_actual = df_actual.dropna(subset=["Producto"])
             df_actual = df_actual[df_actual["Producto"].astype(str).str.strip() != ""]
             
-            # Asegurar tipos numéricos
             df_actual["Margen %"] = pd.to_numeric(df_actual["Margen %"], errors="coerce").fillna(0)
             df_actual["Popularidad (Artículos Vendidos)"] = pd.to_numeric(df_actual["Popularidad (Artículos Vendidos)"], errors="coerce").fillna(0)
 
         if not df_actual.empty:
-            # Calcular promedios principales
             mean_x = df_actual["Margen %"].mean()
             mean_y = df_actual["Popularidad (Artículos Vendidos)"].mean()
             
@@ -125,7 +120,6 @@ for idx, cat in enumerate(categorias):
             
             st.dataframe(df_actual, use_container_width=True)
             
-            # Generar gráfica exclusiva
             st.markdown(f"### 📈 Gráfica BCG — {cat}")
             
             min_x, max_x = df_actual["Margen %"].min(), df_actual["Margen %"].max()
@@ -135,13 +129,11 @@ for idx, cat in enumerate(categorias):
                 
             min_y, max_y = 0, df_actual["Popularidad (Artículos Vendidos)"].max()
             
-            # Cálculo de sub-promedios para los sub-cuadrantes
             sub_x1 = (min_x + mean_x) / 2
             sub_x2 = (mean_x + max_x) / 2
             sub_y1 = (min_y + mean_y) / 2
             sub_y2 = (mean_y + max_y) / 2
             
-            # Panel superior con promedios y sub-promedios en NEGRITAS
             st.info(f"📌 **Promedios Principales (Líneas rojas):** Margen = **{mean_x:.1f}%** | Popularidad = **{mean_y:.1f}**\n\n"
                     f"🔹 **Sub-promedios (Líneas azules):** Margen Izq = **{sub_x1:.1f}%**, Margen Der = **{sub_x2:.1f}%** | "
                     f"Pop. Inf = **{sub_y1:.1f}**, Pop. Sup = **{sub_y2:.1f}**")
@@ -154,14 +146,21 @@ for idx, cat in enumerate(categorias):
             ax.set_xlim(xlim_min, xlim_max)
             ax.set_ylim(ylim_min, ylim_max)
             
-            # --- MARCAS DE AGUA DISCRETAS POR CUADRANTE (FONDO) ---
+            # --- MARCAS DE AGUA CORREGIDAS SEGÚN POSICIÓN TRADICIONAL BCG ---
+            # VACA: Izquierda (Margen bajo), Arriba (Popularidad alta)
             ax.text((xlim_min + mean_x) / 2, (mean_y + ylim_max) / 2, "VACA", 
                     fontsize=40, fontweight='bold', ha='center', va='center', alpha=0.08, color='gray', zorder=0)
+            
+            # ESTRELLA: Derecha (Margen alto), Arriba (Popularidad alta)
             ax.text((mean_x + xlim_max) / 2, (mean_y + ylim_max) / 2, "ESTRELLA", 
                     fontsize=40, fontweight='bold', ha='center', va='center', alpha=0.08, color='gray', zorder=0)
-            ax.text((xlim_min + mean_x) / 2, (mean_y + ylim_max) / 2, "PERRO", 
+            
+            # PERRO: Izquierda (Margen bajo), Abajo (Popularidad baja)
+            ax.text((xlim_min + mean_x) / 2, (ylim_min + mean_y) / 2, "PERRO", 
                     fontsize=40, fontweight='bold', ha='center', va='center', alpha=0.08, color='gray', zorder=0)
-            ax.text((mean_x + xlim_max) / 2, (mean_y + ylim_max) / 2, "INTERROGANTE", 
+            
+            # INTERROGANTE: Derecha (Margen alto), Abajo (Popularidad baja)
+            ax.text((mean_x + xlim_max) / 2, (ylim_min + mean_y) / 2, "INTERROGANTE", 
                     fontsize=35, fontweight='bold', ha='center', va='center', alpha=0.08, color='gray', zorder=0)
             
             # Puntos de dispersión
